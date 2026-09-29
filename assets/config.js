@@ -3,7 +3,7 @@
 window.__APP_CONFIG__ = {
   "SUPABASE_URL": "https://hzmgsapykctoxzzygmjp.supabase.co",
   "SUPABASE_ANON_KEY": "sb_publishable_kApBmVIIkVj1cTZahvw9yw_uaY6sG4k",
-  "SITE_NAME": "访客出入登记",
+  "SITE_NAME": "包装检测实验室进出登记表",
   "SITE_SUBTITLE": "请填写以下信息完成登记",
   "SITE_LOGO": "登"
 };

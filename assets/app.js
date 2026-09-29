@@ -111,7 +111,7 @@
   function showVisitor() {
     hideAll();
     $("viewVisitor").hidden = false;
-    document.title = "访客出入登记";
+    document.title = (window.__APP_CONFIG__ && window.__APP_CONFIG__.SITE_NAME) || "包装检测实验室进出登记表";
   }
   function showAdmin() {
     hideAll();
