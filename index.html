@@ -256,12 +256,32 @@
     document.head.appendChild(s);
   }
 
-  function boot() {
-    ["assets/lib.js", "assets/app.js"].forEach(function (p) {
+  // 必须按顺序串行加载：动态插入的 <script> 默认 async=true，
+  // 并行注入会让 app.js 早于 lib.js 执行，导致 RegLib 未定义。
+  function loadSeq(list, done) {
+    function step(i) {
+      if (i >= list.length) return done();
       var s = document.createElement("script");
-      s.src = p;
+      s.src = list[i];
+      s.async = false;
+      s.onload = function () { step(i + 1); };
+      s.onerror = function () {
+        var b = document.getElementById("boot");
+        if (b) {
+          b.innerHTML = '<div style="max-width:420px;margin:0 auto;text-align:center;padding:24px;">'
+            + '<div style="font-size:34px;margin-bottom:10px;">⚠️</div>'
+            + '<h2 style="font-size:17px;margin:0 0 8px;">加载失败</h2>'
+            + '<p style="color:#6b7280;font-size:14px;line-height:1.7;margin:0;">'
+            + '无法加载 ' + list[i] + '，请刷新页面重试。</p></div>';
+        }
+      };
       document.head.appendChild(s);
-    });
+    }
+    step(0);
+  }
+
+  function boot() {
+    loadSeq(["assets/lib.js", "assets/app.js"], function () {});
   }
 
   function fail() {
@@ -271,7 +291,7 @@
         + '<div style="font-size:34px;margin-bottom:10px;">📡</div>'
         + '<h2 style="font-size:17px;margin:0 0 8px;">组件加载失败</h2>'
         + '<p style="color:#6b7280;font-size:14px;line-height:1.7;margin:0;">'
-        + '无法从网络加载必要组件，请检查网络后刷新重试。</p></div>';
+        + '无法从网络加载必要组件（已尝试 3 个 CDN），请检查网络后刷新重试。</p></div>';
     }
   }
 
