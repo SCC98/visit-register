@@ -10,7 +10,7 @@
 <meta name="apple-mobile-web-app-title" content="出入登记">
 <meta name="robots" content="noindex,nofollow">
 <title>包装检测实验室进出登记表</title>
-<link rel="stylesheet" href="assets/style.css?v=202609292217">
+<link rel="stylesheet" href="assets/style.css?v=202609292222">
 </head>
 <body>
 
@@ -65,6 +65,11 @@
     <div class="notice" id="arriveNotice">
       <span class="notice-ico">🕐</span>
       <span>到访时间已自动填好，如有出入可直接修改</span>
+    </div>
+
+    <div class="notice notice-safety">
+      <span class="notice-ico">⚠️</span>
+      <span>设备运行期间，禁止参观人员进入试验区域。</span>
     </div>
 
     <form id="regForm" autocomplete="on" novalidate>
@@ -247,7 +252,7 @@
   </div>
 </section>
 
-<script src="assets/config.js?v=202609292217"></script>
+<script src="assets/config.js?v=202609292222"></script>
 <!--
   Supabase SDK 依次尝试三个 CDN，任一成功即继续加载业务脚本。
   国内网络环境下单个 CDN 可能被干扰，所以做三层兜底。
@@ -299,7 +304,7 @@
   }
 
   function boot() {
-    loadSeq(["assets/lib.js?v=202609292217", "assets/app.js?v=202609292217"], function () {});
+    loadSeq(["assets/lib.js?v=202609292222", "assets/app.js?v=202609292222"], function () {});
   }
 
   function fail() {
