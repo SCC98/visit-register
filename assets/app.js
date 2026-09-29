@@ -141,6 +141,14 @@
       $("advText").textContent = on ? "收起备注" : "选填：备注";
     });
 
+    // 到访时间默认填当前时刻
+    setVisitTimeNow();
+    $("btnNow").addEventListener("click", function () {
+      setVisitTimeNow();
+      clearBad("fld_visitTime");
+      toast("已填入当前时间");
+    });
+
     $("regForm").addEventListener("submit", onSubmit);
     $("btnAgain").addEventListener("click", resetToForm);
     $("vLock").addEventListener("click", function () {
@@ -151,7 +159,7 @@
     });
 
     // 输入时即时清除红框
-    ["i_name", "i_phone"].forEach(function (id) {
+    ["i_name", "i_phone", "i_visitTime"].forEach(function (id) {
       $(id).addEventListener("input", function () {
         $(id).classList.remove("bad");
         var f = $(id).closest(".fld");
@@ -175,19 +183,34 @@
   function resetToForm() {
     $("vDoneWrap").hidden = true;
     $("vFormWrap").hidden = false;
-    // 保留单位/房间/事由，只清空访客个人信息，方便连续登记同行人员
+    // 保留单位/房间/访问人/事由，只清空访客个人信息，方便连续登记同行人员
     $("i_name").value = "";
     $("i_phone").value = "";
     $("i_remark").value = "";
+    setVisitTimeNow();   // 到访时间重置为当前时刻
     // 清干净上一轮校验留下的红色错误提示（输入框和字段容器两层）
-    ["fld_name", "fld_phone"].forEach(function (id) {
-      var f = $(id);
-      f.classList.remove("bad");
-      var inp = f.querySelector(".ipt");
-      if (inp) inp.classList.remove("bad");
+    ["fld_name", "fld_phone", "fld_visitTime"].forEach(function (id) {
+      clearBad(id);
     });
     window.scrollTo({ top: 0, behavior: "smooth" });
     setTimeout(function () { $("i_name").focus(); }, 240);
+  }
+
+  // 把「到访时间」设为当前时刻（datetime-local 需要 YYYY-MM-DDTHH:mm 格式）
+  function setVisitTimeNow() {
+    var d = new Date();
+    var p = function (n) { return String(n).padStart(2, "0"); };
+    $("i_visitTime").value =
+      d.getFullYear() + "-" + p(d.getMonth() + 1) + "-" + p(d.getDate()) +
+      "T" + p(d.getHours()) + ":" + p(d.getMinutes());
+  }
+
+  function clearBad(fldId) {
+    var f = $(fldId);
+    if (!f) return;
+    f.classList.remove("bad");
+    var inp = f.querySelector(".ipt");
+    if (inp) inp.classList.remove("bad");
   }
 
   function onSubmit(e) {
@@ -200,12 +223,15 @@
       phone: $("i_phone").value.replace(/[\s\-]/g, ""),
       org: $("i_org").value.trim(),
       room: $("i_room").value.trim(),
+      receptionist: $("i_receptionist").value.trim(),
       reason: $("i_reason").value.trim(),
-      remark: $("i_remark").value.trim()
+      remark: $("i_remark").value.trim(),
+      visit_time: $("i_visitTime").value
     };
 
     // 校验
     var bad = [];
+    if (!data.visit_time) bad.push("fld_visitTime");
     if (!data.name) bad.push("fld_name");
     var phoneDigits = data.phone.replace(/[\s\-]/g, "");
     if (!phoneDigits || !/^[0-9+]{6,20}$/.test(phoneDigits)) bad.push("fld_phone");
@@ -217,7 +243,8 @@
       });
       var first = $(bad[0]).querySelector(".ipt");
       if (first) first.focus();
-      toast(bad.indexOf("fld_name") > -1 ? "请填写姓名" : "请填写正确的手机号码");
+      toast(bad.indexOf("fld_visitTime") > -1 ? "请填写到访时间"
+        : (bad.indexOf("fld_name") > -1 ? "请填写姓名" : "请填写正确的手机号码"));
       return;
     }
 
@@ -256,12 +283,14 @@
   }
 
   function showDone(row) {
-    var at = parseDate(row.arrived_at);
+    // 展示访客填写的到访时间；没填则回落到系统记录时间
+    var vt = parseDate(row.visit_time);
     $("doneName").textContent = row.name || "访客";
-    $("doneTime").textContent = fmtDT(at);
+    $("doneTime").textContent = vt ? fmtDT(vt) : "—";
+    $("doneReceptionist").textContent = row.receptionist || "未填写";
     $("doneRoom").textContent = row.room || "未填写";
     $("doneId").textContent = String(row.id || "").slice(0, 8).toUpperCase();
-    $("doneFoot").textContent = "登记时间以服务器为准：" + fmtDT(new Date());
+    $("doneFoot").textContent = "系统记录时间：" + fmtDT(new Date());
     $("vFormWrap").hidden = true;
     $("vDoneWrap").hidden = false;
     window.scrollTo({ top: 0, behavior: "smooth" });
@@ -382,14 +411,18 @@
     RegLib.adminList(adminToken, { limit: 500 })
       .then(function (rows) {
         allRecords = rows.map(function (r) {
+          var vt = parseDate(r.visit_time);
           return {
             id: r.id,
-            visitDate: r.visit_date || fmtDate(parseDate(r.arrived_at)),
+            // 到访时间优先；老数据没有该列时回落到系统记录时间
+            visitTime: vt,
+            visitDate: r.visit_date || fmtDate(vt || parseDate(r.arrived_at)),
             name: r.name || "",
             org: r.org || "",
             phone: r.phone || "",
             room: r.room || "",
             reason: r.reason || "",
+            receptionist: r.receptionist || "",
             arrivedAt: parseDate(r.arrived_at),
             leftAt: parseDate(r.left_at),
             confirmedBy: r.confirmed_by || "",
@@ -422,7 +455,7 @@
   }
   function passSearch(r, q) {
     if (!q) return true;
-    var hay = [r.name, r.org, r.phone, r.room, r.reason, r.confirmedBy, r.remark, r.visitDate]
+    var hay = [r.name, r.org, r.phone, r.room, r.reason, r.receptionist, r.confirmedBy, r.remark, r.visitDate]
       .join(" ").toLowerCase();
     return hay.indexOf(q) > -1;
   }
@@ -432,10 +465,11 @@
     filtered = allRecords.filter(function (r) {
       return passFilter(r) && passSearch(r, q);
     });
+    // 排序以「到访时间」为准，老数据回落到系统记录时间
     filtered.sort(function (a, b) {
-      var x = a.arrivedAt ? a.arrivedAt.getTime() : 0;
-      var y = b.arrivedAt ? b.arrivedAt.getTime() : 0;
-      return y - x;
+      var x = (a.visitTime || a.arrivedAt);
+      var y = (b.visitTime || b.arrivedAt);
+      return (y ? y.getTime() : 0) - (x ? x.getTime() : 0);
     });
     renderAdmin();
   }
@@ -461,19 +495,27 @@
 
   function recHtml(r) {
     var inFacility = !r.leftAt;
-    var timeTxt = fmtTime(r.arrivedAt) + (r.leftAt ? " → " + fmtTime(r.leftAt) : " → 进行中");
+    // 展示与停留时长计算都以「到访时间」为准；arrivedAt 是系统记录，仅作参考
+    var start = r.visitTime || r.arrivedAt;
+    var timeTxt = fmtTime(start) + (r.leftAt ? " → " + fmtTime(r.leftAt) : " → 进行中");
     var stay = "";
-    if (r.arrivedAt && r.leftAt) {
-      var mins = Math.max(0, Math.round((r.leftAt - r.arrivedAt) / 60000));
+    if (start && r.leftAt) {
+      var mins = Math.max(0, Math.round((r.leftAt - start) / 60000));
       stay = " · 停留 " + (mins >= 60 ? Math.floor(mins / 60) + " 小时 " + (mins % 60) + " 分" : mins + " 分钟");
     }
 
     var kv = "";
     kv += '<div><dt>手机号码</dt><dd class="mono">' + (r.phone ? esc(r.phone) : "—") + '</dd></div>';
     kv += '<div><dt>所到房间</dt><dd>' + (r.room ? esc(r.room) : "—") + '</dd></div>';
-    kv += '<div class="wide"><dt>事由</dt><dd>' + (r.reason ? esc(r.reason) : "—") + '</dd></div>';
+    kv += '<div><dt>访问人</dt><dd>' + (r.receptionist ? esc(r.receptionist) : "—") + '</dd></div>';
     kv += '<div><dt>确认人</dt><dd>' + (r.confirmedBy ? esc(r.confirmedBy) : "—") + '</dd></div>';
-    if (r.remark) kv += '<div><dt>备注</dt><dd>' + esc(r.remark) + '</dd></div>';
+    kv += '<div class="wide"><dt>事由</dt><dd>' + (r.reason ? esc(r.reason) : "—") + '</dd></div>';
+    if (r.remark) kv += '<div class="wide"><dt>备注</dt><dd>' + esc(r.remark) + '</dd></div>';
+    // 系统记录时间只在两者不一致时显示，避免平时干扰
+    if (r.arrivedAt && start && fmtTime(r.arrivedAt) !== fmtTime(start)) {
+      kv += '<div class="wide"><dt>系统记录</dt><dd style="color:var(--sub2);font-size:12.5px;">实际提交 '
+        + esc(fmtDT(r.arrivedAt)) + '</dd></div>';
+    }
 
     return '<article class="rec ' + (inFacility ? "in" : "") + '" data-id="' + r.id + '">'
       + '<div class="rec-top">'
@@ -487,7 +529,7 @@
         + '</div>'
       + '</div>'
       + '<dl class="rec-kv">' + kv + '</dl>'
-      + '<div class="rec-time" style="margin-top:8px;">到达 ' + esc(timeTxt) + esc(stay) + '</div>'
+      + '<div class="rec-time" style="margin-top:8px;">到访 ' + esc(timeTxt) + esc(stay) + '</div>'
       + '<div class="rec-actions">'
         + (inFacility
             ? '<button type="button" class="b-depart" data-act="depart">🚪 记录离开</button>'
@@ -563,7 +605,11 @@
   }
 
   /* ---------------- 导出 ---------------- */
-  var CSV_HEADERS = ["日期", "姓名", "所在单位", "手机号码", "所到房间", "事由", "到达时间", "离开时间", "确认人", "备注"];
+  // 与原始纸质表格的列对齐；「到达时间（系统记录）」放最后，供核对用
+  var CSV_HEADERS = [
+    "日期", "姓名", "所在单位", "手机号码", "所到房间", "事由",
+    "到访时间", "离开时间", "访问人", "确认人", "备注", "到达时间（系统记录）",
+  ];
 
   function exportCsv() {
     if (!filtered.length) { toast("当前没有可导出的记录"); return; }
@@ -575,10 +621,12 @@
         r.phone,
         r.room,
         r.reason,
-        fmtTime(r.arrivedAt),
+        fmtTime(r.visitTime || r.arrivedAt),
         r.leftAt ? fmtTime(r.leftAt) : "",
+        r.receptionist,
         r.confirmedBy,
-        r.remark
+        r.remark,
+        fmtTime(r.arrivedAt)
       ];
     });
     var csv = [CSV_HEADERS].concat(rows).map(function (line) {

@@ -42,7 +42,7 @@
   /* ---------------- 访客：提交登记 ---------------- */
   // 注意：这里刻意只传访客能填的字段。
   // arrived_at 由数据库默认值生成，left_at / confirmed_by 由 RLS 策略强制为空，
-  // 访客无法伪造到达时间，也无法把自己标成"已离开"。
+  // 访客无法伪造系统记录的到达时间，也无法把自己标成"已离开"。
   function submitRegistration(payload) {
     var row = {
       name: String(payload.name || "").trim().slice(0, 30),
@@ -50,17 +50,48 @@
       org: trimOrNull(payload.org, 60),
       room: trimOrNull(payload.room, 40),
       reason: trimOrNull(payload.reason, 80),
+      // 到访时间由访客填写（可改），格式 YYYY-MM-DDTHH:mm，直接存 timestamptz
+      visit_time: normalizeLocalTime(payload.visit_time),
+      receptionist: trimOrNull(payload.receptionist, 30),   // 访问人：被访者 / 接待方
       remark: trimOrNull(payload.remark, 60)
     };
+    return insertRow(row, true);
+  }
+
+  // 插入一条记录。
+  // 关键的保护：如果数据库还没执行加列脚本（缺 visit_time / receptionist），
+  // 就自动去掉这两个字段重试一次，保证访客仍能正常登记，不会因为改表没做完而失败。
+  function insertRow(row, allowFallback) {
     return client
       .from("visitors")
       .insert(row)
       .select("id, name, arrived_at, room")
       .single()
       .then(function (res) {
-        if (res.error) throw new Error(humanize(res.error));
+        if (res.error) {
+          var msg = String(res.error.message || "");
+          var missingColumn = res.error.code === "PGRST204"
+            || /column .* does not exist/i.test(msg)
+            || /Could not find the '.*' column/i.test(msg);
+          if (allowFallback && missingColumn) {
+            var slim = {};
+            Object.keys(row).forEach(function (k) {
+              if (k !== "visit_time" && k !== "receptionist") slim[k] = row[k];
+            });
+            return insertRow(slim, false);
+          }
+          throw new Error(humanize(res.error));
+        }
         return res.data;
       });
+  }
+
+  // <input type="datetime-local"> 给的是 "2026-09-30T09:15"，本地时区含义
+  function normalizeLocalTime(v) {
+    var s = String(v == null ? "" : v).trim();
+    if (!s) return null;
+    if (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/.test(s)) return null;
+    return s.length === 16 ? s + ":00" : s;
   }
 
   function normalPhone(v) {

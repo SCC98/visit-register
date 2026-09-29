@@ -64,10 +64,20 @@
   <main class="v-main" id="vFormWrap">
     <div class="notice" id="arriveNotice">
       <span class="notice-ico">🕐</span>
-      <span>到达时间将由系统自动记录，您无需填写</span>
+      <span>到访时间已自动填好，如有出入可直接修改</span>
     </div>
 
     <form id="regForm" autocomplete="on" novalidate>
+      <div class="fld" id="fld_visitTime">
+        <label for="i_visitTime">到访时间<i class="req">*</i></label>
+        <div class="row">
+          <input type="datetime-local" id="i_visitTime" name="visitTime" class="ipt"
+                 enterkeyhint="next" required>
+          <button type="button" class="quick" id="btnNow">现在</button>
+        </div>
+        <div class="err">请填写到访时间</div>
+      </div>
+
       <div class="fld" id="fld_name">
         <label for="i_name">姓名<i class="req">*</i></label>
         <input type="text" id="i_name" name="name" class="ipt" placeholder="请输入您的姓名"
@@ -92,6 +102,12 @@
         <label for="i_room">所到房间</label>
         <input type="text" id="i_room" name="room" class="ipt" placeholder="如：301 实验室"
                maxlength="40" enterkeyhint="next">
+      </div>
+
+      <div class="fld" id="fld_receptionist">
+        <label for="i_receptionist">访问人</label>
+        <input type="text" id="i_receptionist" name="receptionist" class="ipt"
+               placeholder="您要找的人 / 接待部门" maxlength="30" enterkeyhint="next">
       </div>
 
       <div class="fld" id="fld_reason">
@@ -130,7 +146,8 @@
       <p class="done-sub">欢迎您，<b id="doneName">访客</b></p>
 
       <dl class="done-kv">
-        <div><dt>到达时间</dt><dd id="doneTime">—</dd></div>
+        <div><dt>到访时间</dt><dd id="doneTime">—</dd></div>
+        <div><dt>访问人</dt><dd id="doneReceptionist">—</dd></div>
         <div><dt>所到房间</dt><dd id="doneRoom">—</dd></div>
         <div><dt>登记编号</dt><dd class="mono" id="doneId">—</dd></div>
       </dl>
