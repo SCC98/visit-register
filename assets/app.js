@@ -111,7 +111,9 @@
   function showVisitor() {
     hideAll();
     $("viewVisitor").hidden = false;
-    document.title = (window.__APP_CONFIG__ && window.__APP_CONFIG__.SITE_NAME) || "包装检测实验室进出登记表";
+    // 同理：标题直接写死，不依赖 config.js，避免缓存导致显示旧名称
+    var t = $("vTitle");
+    document.title = (t && t.textContent.trim()) || "包装检测实验室进出登记表";
   }
   function showAdmin() {
     hideAll();
@@ -129,9 +131,11 @@
   var submitting = false;
 
   function initVisitor() {
-    // 已有配置时展示单位/房间提示（可选，配置里没写就保持默认）
+    // 站点名称直接写在 index.html 里，不从 config.js 取。
+    // 原因：GitHub Pages 对静态文件强制缓存 10 分钟，若从 config.js 运行时覆盖标题，
+    // 改了名称后浏览器会仍显示旧名称（config.js 是旧的，而 HTML 是新的）。
+    // 副标题/图标仍可由配置覆盖，这两个改得少。
     var cfg = window.__APP_CONFIG__ || {};
-    if (cfg.SITE_NAME) $("vTitle").textContent = cfg.SITE_NAME;
     if (cfg.SITE_SUBTITLE) $("vSub").textContent = cfg.SITE_SUBTITLE;
     if (cfg.SITE_LOGO) $("vLogo").textContent = cfg.SITE_LOGO;
 
