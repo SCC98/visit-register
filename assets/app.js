@@ -286,14 +286,22 @@
     $("btnSpin").hidden = !on;
   }
 
-  function showDone(row) {
-    // 展示访客填写的到访时间；没填则回落到系统记录时间
+  // res 的形状是 { ok: true, submitted: {...} }。
+  // 因为插入时不回读记录（回读需要 SELECT 权限，而 anon 故意没有该权限），
+  // 所以成功页展示的是「表单提交的内容」，而不是数据库返回的行。
+  function showDone(res) {
+    var row = (res && res.submitted) || {};
     var vt = parseDate(row.visit_time);
     $("doneName").textContent = row.name || "访客";
     $("doneTime").textContent = vt ? fmtDT(vt) : "—";
     $("doneReceptionist").textContent = row.receptionist || "未填写";
     $("doneRoom").textContent = row.room || "未填写";
-    $("doneId").textContent = String(row.id || "").slice(0, 8).toUpperCase();
+    // 登记编号由客户端生成：不回读记录拿不到数据库 id，
+    // 这个编号只用于访客向工作人员报出，不需要与数据库一致。
+    var d = new Date();
+    var p = function (n) { return String(n).padStart(2, "0"); };
+    $("doneId").textContent = p(d.getHours()) + p(d.getMinutes()) + p(d.getSeconds())
+      + String(Math.floor(Math.random() * 90) + 10);
     $("doneFoot").textContent = "系统记录时间：" + fmtDT(new Date());
     $("vFormWrap").hidden = true;
     $("vDoneWrap").hidden = false;

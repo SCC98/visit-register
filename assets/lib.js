@@ -59,20 +59,28 @@
   }
 
   // 插入一条记录。
-  // 关键的保护：如果数据库还没执行加列脚本（缺 visit_time / receptionist），
-  // 就自动去掉这两个字段重试一次，保证访客仍能正常登记，不会因为改表没做完而失败。
+  //
+  // 【重要】这里刻意不使用 .select()。
+  //   PostgREST 的 .select() 会让 INSERT 带上 RETURNING，也就是插入后回读这条记录；
+  //   而回读需要 SELECT 权限 + SELECT 策略。本方案刻意不给 anon 任何 SELECT 策略
+  //   （防止访客读到别人的手机号），因此带 RETURNING 的插入会被策略拒绝，
+  //   报错信息是 "new row violates row-level security policy"——插入其实成功了，
+  //   是回读那一步失败导致整个请求报错。
+  //   不带 RETURNING 时 PostgREST 返回 201，插入正常完成。
+  //
+  // 另一个保护：数据库若还没执行加列脚本（缺 visit_time / receptionist），
+  // 自动去掉这两个字段重试一次，保证访客仍能登记。
   function insertRow(row, allowFallback) {
     return client
       .from("visitors")
       .insert(row)
-      .select("id, name, arrived_at, room")
-      .single()
       .then(function (res) {
         if (res.error) {
           var msg = String(res.error.message || "");
           var missingColumn = res.error.code === "PGRST204"
             || /column .* does not exist/i.test(msg)
-            || /Could not find the '.*' column/i.test(msg);
+            || /Could not find the '.*' column/i.test(msg)
+            || /schema cache/i.test(msg);
           if (allowFallback && missingColumn) {
             var slim = {};
             Object.keys(row).forEach(function (k) {
@@ -82,7 +90,8 @@
           }
           throw new Error(humanize(res.error));
         }
-        return res.data;
+        // 不回读记录，直接返回提交的内容供成功页展示
+        return { ok: true, submitted: row };
       });
   }
 
