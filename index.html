@@ -1,0 +1,282 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="format-detection" content="telephone=no">
+<meta name="theme-color" content="#1868f2">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="出入登记">
+<meta name="robots" content="noindex,nofollow">
+<title>访客出入登记</title>
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+
+<!-- 加载态 -->
+<div id="boot" class="boot">
+  <div class="spinner"></div>
+  <div class="boot-text">正在加载…</div>
+</div>
+
+<!-- 配置缺失提示 -->
+<div id="cfgError" class="cfg-error" hidden>
+  <div class="cfg-card">
+    <div class="cfg-ico">⚙️</div>
+    <h2>还没有配置数据库</h2>
+    <p>这个页面需要连接 Supabase 才能工作。</p>
+    <ol class="cfg-steps">
+      <li>在 Supabase 建好项目，执行 <code>supabase/schema.sql</code></li>
+      <li>在部署平台设置环境变量：
+        <code>SUPABASE_URL</code>、<code>SUPABASE_ANON_KEY</code></li>
+      <li>重新部署后刷新本页</li>
+    </ol>
+    <details class="cfg-detail">
+      <summary>本地临时测试</summary>
+      <p>在项目根目录新建 <code>local-config.js</code>，内容：</p>
+      <pre>window.__APP_CONFIG__ = {
+  SUPABASE_URL: "https://xxxx.supabase.co",
+  SUPABASE_ANON_KEY: "eyJhbGciOi..."
+};</pre>
+    </details>
+  </div>
+</div>
+
+<!-- ==================== 访客端 ==================== -->
+<div id="viewVisitor" hidden>
+
+  <!-- 顶部 -->
+  <header class="v-head">
+    <div class="v-head-inner">
+      <div class="v-brand">
+        <div class="v-logo" id="vLogo">登</div>
+        <div>
+          <h1 class="v-title" id="vTitle">访客出入登记</h1>
+          <p class="v-sub" id="vSub">请填写以下信息完成登记</p>
+        </div>
+      </div>
+      <button type="button" class="v-lock" id="vLock" title="管理员入口" aria-label="管理员入口">🔒</button>
+    </div>
+  </header>
+
+  <!-- 表单 -->
+  <main class="v-main" id="vFormWrap">
+    <div class="notice" id="arriveNotice">
+      <span class="notice-ico">🕐</span>
+      <span>到达时间将由系统自动记录，您无需填写</span>
+    </div>
+
+    <form id="regForm" autocomplete="on" novalidate>
+      <div class="fld" id="fld_name">
+        <label for="i_name">姓名<i class="req">*</i></label>
+        <input type="text" id="i_name" name="name" class="ipt" placeholder="请输入您的姓名"
+               maxlength="30" autocomplete="name" enterkeyhint="next" required>
+        <div class="err">请填写姓名</div>
+      </div>
+
+      <div class="fld" id="fld_phone">
+        <label for="i_phone">手机号码<i class="req">*</i></label>
+        <input type="tel" id="i_phone" name="phone" class="ipt" placeholder="11 位手机号"
+               maxlength="20" inputmode="tel" autocomplete="tel" enterkeyhint="next" required>
+        <div class="err">请填写 11 位手机号码</div>
+      </div>
+
+      <div class="fld" id="fld_org">
+        <label for="i_org">所在单位</label>
+        <input type="text" id="i_org" name="org" class="ipt" placeholder="如：XX 有限公司"
+               maxlength="60" autocomplete="organization" enterkeyhint="next">
+      </div>
+
+      <div class="fld" id="fld_room">
+        <label for="i_room">所到房间</label>
+        <input type="text" id="i_room" name="room" class="ipt" placeholder="如：301 实验室"
+               maxlength="40" enterkeyhint="next">
+      </div>
+
+      <div class="fld" id="fld_reason">
+        <label for="i_reason">事由</label>
+        <input type="text" id="i_reason" name="reason" class="ipt" placeholder="如：设备调试 / 业务洽谈"
+               maxlength="80" enterkeyhint="next">
+      </div>
+
+      <button type="button" class="adv-toggle" id="btnAdv">
+        <span id="advText">选填：备注</span>
+        <span class="arrow">▼</span>
+      </button>
+      <div class="adv-box" id="advBox">
+        <div class="fld">
+          <label for="i_remark">备注</label>
+          <input type="text" id="i_remark" name="remark" class="ipt"
+                 placeholder="随行人数、车牌号等" maxlength="60" enterkeyhint="done">
+        </div>
+      </div>
+
+      <div class="submit-area">
+        <button type="submit" class="btn btn-primary btn-lg" id="btnSubmit">
+          <span id="btnSubmitText">提交登记</span>
+          <span class="btn-spin" id="btnSpin" hidden></span>
+        </button>
+        <p class="submit-hint">提交后请到前台领取访客证</p>
+      </div>
+    </form>
+  </main>
+
+  <!-- 提交成功 -->
+  <main class="v-main" id="vDoneWrap" hidden>
+    <div class="done">
+      <div class="done-ico">✓</div>
+      <h2 class="done-title">登记成功</h2>
+      <p class="done-sub">欢迎您，<b id="doneName">访客</b></p>
+
+      <dl class="done-kv">
+        <div><dt>到达时间</dt><dd id="doneTime">—</dd></div>
+        <div><dt>所到房间</dt><dd id="doneRoom">—</dd></div>
+        <div><dt>登记编号</dt><dd class="mono" id="doneId">—</dd></div>
+      </dl>
+
+      <div class="done-tip">
+        <b>离开时</b>请到前台告知工作人员，由工作人员为您记录离开时间。
+      </div>
+
+      <div class="done-actions">
+        <button type="button" class="btn btn-primary btn-lg" id="btnAgain">再登记一位同行人员</button>
+      </div>
+
+      <p class="done-foot" id="doneFoot"></p>
+    </div>
+  </main>
+</div>
+
+<!-- ==================== 管理端 ==================== -->
+<div id="viewAdmin" hidden>
+  <header class="a-head">
+    <div class="a-head-inner">
+      <div>
+        <h1 class="a-title">出入登记管理</h1>
+        <p class="a-sub" id="aSub">共 0 条记录</p>
+      </div>
+      <div class="a-head-actions">
+        <button type="button" class="a-icon" id="aRefresh" title="刷新">↻</button>
+        <button type="button" class="a-icon" id="aLogout" title="退出">⏏</button>
+      </div>
+    </div>
+    <div class="a-chips" id="aChips">
+      <button type="button" class="chip on" data-f="today">今天<i id="cToday">0</i></button>
+      <button type="button" class="chip" data-f="week">近 7 天<i id="cWeek">0</i></button>
+      <button type="button" class="chip" data-f="in">未离开<i id="cIn">0</i></button>
+      <button type="button" class="chip" data-f="all">全部<i id="cAll">0</i></button>
+    </div>
+    <div class="a-toolbar">
+      <input type="search" id="aSearch" class="a-search" placeholder="搜索姓名 / 单位 / 手机号 / 房间">
+      <button type="button" class="a-btn" id="btnExportCsv">导出 Excel</button>
+    </div>
+  </header>
+
+  <main class="a-main" id="aList"></main>
+
+  <div class="a-empty" id="aEmpty" hidden>
+    <div class="a-empty-ico">📋</div>
+    <div class="a-empty-t">暂无记录</div>
+    <div class="a-empty-s">把这个页面的二维码给访客扫描即可开始登记</div>
+  </div>
+</div>
+
+<!-- 管理端登录 -->
+<div id="viewLogin" class="login-wrap" hidden>
+  <div class="login-card">
+    <div class="login-ico">🔐</div>
+    <h2>管理员登录</h2>
+    <p>请输入管理口令以查看访客登记记录</p>
+    <input type="password" id="loginToken" class="ipt" placeholder="管理口令"
+           autocomplete="current-password" enterkeyhint="go">
+    <div class="login-err" id="loginErr" hidden>口令不正确，请重试</div>
+    <button type="button" class="btn btn-primary btn-lg" id="btnLogin">进入管理页</button>
+    <button type="button" class="btn btn-link" id="btnBackVisitor">返回访客登记页</button>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<!-- 记录离开面板 -->
+<div class="mask" id="mask" hidden></div>
+<section class="sheet" id="departSheet" hidden role="dialog" aria-modal="true">
+  <div class="grab"></div>
+  <div class="sheet-head">
+    <h3>记录离开</h3>
+    <button type="button" class="sheet-close" id="sheetClose" aria-label="关闭">✕</button>
+  </div>
+  <div class="sheet-body">
+    <p class="sheet-who" id="departWho">—</p>
+    <div class="fld">
+      <label for="d_time">离开时间</label>
+      <div class="row">
+        <input type="time" id="d_time" class="ipt">
+        <button type="button" class="quick" id="d_now">现在</button>
+      </div>
+    </div>
+    <div class="fld">
+      <label for="d_by">确认人</label>
+      <input type="text" id="d_by" class="ipt" placeholder="接待 / 值班人姓名" maxlength="30">
+    </div>
+    <div class="fld">
+      <label for="d_remark">备注</label>
+      <input type="text" id="d_remark" class="ipt" placeholder="选填" maxlength="60">
+    </div>
+  </div>
+  <div class="sheet-foot">
+    <button type="button" class="btn btn-primary btn-lg" id="btnDepartSave">确认离开</button>
+  </div>
+</section>
+
+<script src="assets/config.js"></script>
+<!--
+  Supabase SDK 依次尝试三个 CDN，任一成功即继续加载业务脚本。
+  国内网络环境下单个 CDN 可能被干扰，所以做三层兜底。
+-->
+<script>
+(function () {
+  var CDNS = [
+    "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js",
+    "https://unpkg.com/@supabase/supabase-js@2.45.4/dist/umd/supabase.js",
+    "https://esm.sh/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"
+  ];
+  var i = 0;
+
+  function next() {
+    if (window.supabase && window.supabase.createClient) return boot();
+    if (i >= CDNS.length) return fail();
+    var s = document.createElement("script");
+    s.src = CDNS[i++];
+    s.onload = function () {
+      if (window.supabase && window.supabase.createClient) boot();
+      else next();          // 下载成功但不是预期内容，继续换下一个
+    };
+    s.onerror = next;
+    document.head.appendChild(s);
+  }
+
+  function boot() {
+    ["assets/lib.js", "assets/app.js"].forEach(function (p) {
+      var s = document.createElement("script");
+      s.src = p;
+      document.head.appendChild(s);
+    });
+  }
+
+  function fail() {
+    var b = document.getElementById("boot");
+    if (b) {
+      b.innerHTML = '<div style="max-width:420px;margin:0 auto;text-align:center;padding:24px;">'
+        + '<div style="font-size:34px;margin-bottom:10px;">📡</div>'
+        + '<h2 style="font-size:17px;margin:0 0 8px;">组件加载失败</h2>'
+        + '<p style="color:#6b7280;font-size:14px;line-height:1.7;margin:0;">'
+        + '无法从网络加载必要组件，请检查网络后刷新重试。</p></div>';
+    }
+  }
+
+  next();
+})();
+</script>
+</body>
+</html>
